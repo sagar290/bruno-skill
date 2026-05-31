@@ -1,0 +1,16 @@
+# Bruno Integration Rules for Cursor
+
+# Trigger rules for Cursor's Composer and Agent modes
+# Copy this content to a file named `.cursorrules` in your project root.
+
+rules:
+  - name: Auto-Sync Bruno API Collection
+    description: Automatically run the sync script when routes/controllers change.
+    pattern: "(.*router.*|.*controller.*|.*routes.*|.*api.*)\\.(go|js|ts|py)"
+    instructions: |
+      You have edited API routing or controller files. 
+      To keep the developer's Bruno collection in sync with the codebase:
+      1. Check the project root for `config.yaml` or `.env` to locate `BRUNO_COLLECTION_PATH`.
+      2. Execute the sync script in the terminal (ensure the path matches your local skill folder location):
+         python3 skills/bruno/scripts/sync_bruno.py sync
+      3. Confirm in the chat that the collection was successfully synchronized so the developer can see the updates in their VS Code Bruno extension.

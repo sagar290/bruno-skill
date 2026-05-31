@@ -1,0 +1,25 @@
+meta {
+  name: GET /api/v2/posts/:id
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v2/posts/:id
+  body: none
+  auth: none
+}
+
+headers {
+  X-Custom-Header: antiautomatic
+}
+
+params:path {
+  id: 
+}
+
+tests {
+  test("status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

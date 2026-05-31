@@ -1,0 +1,15 @@
+meta {
+  name: DELETE /api/v2/posts/:id
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/v2/posts/:id
+  body: none
+  auth: none
+}
+
+params:path {
+  id: 
+}
