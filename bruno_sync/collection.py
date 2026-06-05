@@ -158,21 +158,26 @@ def prune_orphaned_files(collection_dir: str, active_routes: list[dict[str, str]
 
 def initialize_collection(collection_dir: str, collection_name: str) -> None:
     """Create a bruno.json file at the collection root if not present."""
-    os.makedirs(collection_dir, exist_ok=True)
     bruno_json_path = os.path.join(collection_dir, "bruno.json")
 
-    if not os.path.exists(bruno_json_path):
-        bjson = {
-            "version": "1",
-            "name": collection_name,
-            "type": "collection",
-            "ignore": ["node_modules", ".git"],
-        }
-        with open(bruno_json_path, "w", encoding="utf-8") as f:
-            json.dump(bjson, f, indent=2)
-        print_success(f"Initialized new Bruno Collection '{collection_name}' at {collection_dir}")
-    else:
+    if os.path.exists(bruno_json_path):
         print_info(f"Existing Bruno Collection detected at {collection_dir}")
+        return
+
+    if DRY_RUN:
+        print_info(f"[DRY-RUN] Would initialize Bruno Collection '{collection_name}' at {collection_dir}")
+        return
+
+    os.makedirs(collection_dir, exist_ok=True)
+    bjson = {
+        "version": "1",
+        "name": collection_name,
+        "type": "collection",
+        "ignore": ["node_modules", ".git"],
+    }
+    with open(bruno_json_path, "w", encoding="utf-8") as f:
+        json.dump(bjson, f, indent=2)
+    print_success(f"Initialized new Bruno Collection '{collection_name}' at {collection_dir}")
 
 
 def dedup_collection(collection_dir: str, all_entries: list) -> int:

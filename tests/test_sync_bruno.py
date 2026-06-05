@@ -472,6 +472,22 @@ public class UserController {
         paths = {r['path'] for r in routes}
         self.assertIn('/api/v1/users', paths)
 
+    def test_spring_skips_class_level_prefix_as_endpoint(self):
+        content = '''@RestController
+@RequestMapping("/api/v1")
+public class UserController {
+    @GetMapping("/users")
+    public List<User> listUsers() { return null; }
+}'''
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.java', delete=False) as f:
+            f.write(content)
+            f.flush()
+            routes = scan_java_spring_file_for_routes(f.name)
+        os.unlink(f.name)
+        paths = {r['path'] for r in routes}
+        self.assertNotIn('/api/v1', paths)
+        self.assertIn('/api/v1/users', paths)
+
 
 class TestNextjsScanner(unittest.TestCase):
     def test_nextjs_route_handlers(self):
@@ -490,6 +506,19 @@ export async function POST(request: Request) {
         methods = {r['method'] for r in routes}
         self.assertIn('GET', methods)
         self.assertIn('POST', methods)
+
+    def test_nextjs_app_router_strips_route_suffix(self):
+        fpath = '/projects/app/api/users/route.ts'
+        routes = scan_nextjs_file_for_routes(fpath)
+        paths = {r['path'] for r in routes}
+        self.assertIn('/api/users', paths)
+        self.assertNotIn('/api/users/route', paths)
+
+    def test_nextjs_non_get_uses_inferred_path(self):
+        fpath = '/projects/app/api/users/route.ts'
+        routes = scan_nextjs_file_for_routes(fpath)
+        get_routes = [r for r in routes if r['method'] == 'GET']
+        self.assertTrue(any(r['path'] == '/api/users' for r in get_routes))
 
 
 class TestFastifyScanner(unittest.TestCase):
@@ -801,6 +830,15 @@ class TestInitializeCollection(unittest.TestCase):
         with open(bruno_json, 'r') as f:
             data = json.load(f)
         self.assertEqual(data['name'], 'Old Name')
+
+    def test_respects_dry_run(self):
+        collection_dir = os.path.join(self.tmpdir, 'dry-run-collection')
+        set_dry_run(True)
+        try:
+            initialize_collection(collection_dir, 'Dry Run API')
+            self.assertFalse(os.path.exists(os.path.join(collection_dir, 'bruno.json')))
+        finally:
+            set_dry_run(False)
 
 
 class TestPruneOrphaned(unittest.TestCase):

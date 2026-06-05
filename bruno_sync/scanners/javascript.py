@@ -11,15 +11,17 @@ def scan_nextjs_file_for_routes(filepath: str) -> list[RouteInfo]:
     """Scan Next.js app router directory structure and API route handlers."""
     routes: list[RouteInfo] = []
     filepath_norm = filepath.replace("\\", "/")
+    inferred_path: str | None = None
 
     if "/api/" in filepath_norm:
-        api_match = re.search(r"/api/(.+?)(?:\.\w+)?$", filepath_norm)
+        raw_path = filepath_norm
+        raw_path = re.sub(r"/route\.\w+$", "", raw_path)
+        raw_path = re.sub(r"\.\w+$", "", raw_path)
+        raw_path = re.sub(r"\[\[?\w+\]\]?", lambda m: ":param", raw_path)
+        api_match = re.search(r"/api(/.*)", raw_path)
         if api_match:
-            path_part = api_match.group(1)
-            path_part = re.sub(r"/route\.\w+$", "", path_part)
-            path_part = re.sub(r"\[\[?\w+\]\]?", lambda m: ":param", path_part)
-            path = "/api/" + path_part
-            routes.append({"method": "GET", "path": normalize_path(path), "source": filepath})
+            inferred_path = normalize_path(api_match.group(0))
+            routes.append({"method": "GET", "path": inferred_path, "source": filepath})
 
     try:
         with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
@@ -33,7 +35,8 @@ def scan_nextjs_file_for_routes(filepath: str) -> list[RouteInfo]:
     for match in next_handler_pattern.finditer(content):
         method = match.group(1).upper()
         if not any(r["method"] == method for r in routes):
-            routes.append({"method": method, "path": "/", "source": filepath})
+            path = inferred_path if inferred_path else "/"
+            routes.append({"method": method, "path": path, "source": filepath})
 
     export_handler_pattern = re.compile(
         r"export\s+default\s+(?:async\s+)?function\s+\w+\s*\(\s*(?:req|request)\b",

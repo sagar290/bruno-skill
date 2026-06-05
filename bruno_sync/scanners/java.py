@@ -36,6 +36,7 @@ def scan_java_spring_file_for_routes(filepath: str) -> list[RouteInfo]:
         ),
     ]
 
+    seen_paths: set[str] = set()
     for pattern, default_method in method_patterns:
         for match in re.finditer(pattern, content):
             path = match.group(1)
@@ -47,12 +48,17 @@ def scan_java_spring_file_for_routes(filepath: str) -> list[RouteInfo]:
                 method = "GET"
             full_path = join_url_paths(class_prefix, path)
             routes.append({"method": method.upper(), "path": normalize_path(full_path), "source": filepath})
+            seen_paths.add(path)
 
     bare_request_mapping = re.compile(
         r"@RequestMapping\(\s*(?:value\s*=\s*)?[\"']([^\"']+)[\"'][^)]*\)"
     )
     for match in bare_request_mapping.finditer(content):
         path = match.group(1)
+        if path == class_prefix and class_prefix:
+            continue
+        if path in seen_paths:
+            continue
         full_path = join_url_paths(class_prefix, path)
         for method in ["GET", "POST", "PUT", "DELETE"]:
             routes.append({"method": method, "path": normalize_path(full_path), "source": filepath})
