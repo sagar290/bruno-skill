@@ -5,7 +5,7 @@ description: "Equips agents with capabilities to discover, create, update, and m
 
 # Bruno Integration Skill
 
-Bruno is a Git-friendly, file-based API client that stores collections directly in your repository as standard markup files (`.bru`). This skill allows AI agents and developers to collaborate seamlessly on API testing and development. 
+Bruno is a Git-friendly, file-based API client that stores collections directly in your repository as standard markup files (`.bru`). This skill allows AI agents and developers to collaborate seamlessly on API testing and development.
 
 Since Bruno stores all requests as simple text files, any changes or additions made by an agent are instantly reflected in the developer's VS Code or Cursor Bruno extensions.
 
@@ -13,7 +13,7 @@ Since Bruno stores all requests as simple text files, any changes or additions m
 
 ## Capabilities & Workflows
 
-1. **Auto-Discovery of API Routes**: Automatically analyze codebases (independent of stack - e.g., Go, Node.js, Python, Java) to discover endpoints.
+1. **Auto-Discovery of API Routes**: Automatically analyze codebases (Go/Gin/Chi/mux, Express/Fastify/Koa, Next.js, Flask/FastAPI, Spring Boot, Rails, and more) to discover endpoints.
 2. **Synchronized State**: Read project configurations (`.env`, `config.yaml`, `config.yml`, or `bruno.json`) to find the Bruno collection folder and automatically generate or update `.bru` request files.
 3. **Harmonious Merging**: Ensure that when endpoints are updated, manually created headers, parameters, and Javascript assertions/tests in the `.bru` files are carefully merged and preserved.
 4. **Git-Friendly API Management**: Store and commit API collections in version control alongside the source code.
@@ -22,23 +22,37 @@ Since Bruno stores all requests as simple text files, any changes or additions m
 
 ## Route Sync Utility
 
-This skill includes a zero-dependency CLI script located at:
-[sync_bruno.py](scripts/sync_bruno.py)
+This skill includes a zero-dependency, installable Python package with a CLI command:
 
-### How to Run the Sync Script
+```
+bruno-sync sync              # Scan codebase and sync .bru files
+bruno-sync sync --dry-run    # Preview changes without writing
+bruno-sync sync --prune      # Also remove orphaned .bru files
+bruno-sync sync --dedup      # Remove duplicate .bru files
+bruno-sync prune             # Standalone prune of orphaned files
+bruno-sync add-endpoint --method POST --path /api/v1/users
+```
 
-Use this script to create or update your Bruno collection based on codebase changes or configuration files:
+Alternatively, for submodule/clone installs:
+```bash
+python3 scripts/sync_bruno.py sync
+python3 scripts/sync_bruno.py sync --dry-run --verbose
+python3 scripts/sync_bruno.py prune
+```
+
+### Verbosity Control
+
+| Flag | Behavior |
+|---|---|
+| `-v` / `--verbose` | Show detailed debug output |
+| `-q` / `--quiet` | Suppress all non-error output (ideal for CI) |
+
+### Configuration
 
 ```bash
-# Sync endpoints using default search directories
-python3 scripts/sync_bruno.py sync
-
-# Sync specifying a custom config file or environment file
-python3 scripts/sync_bruno.py sync --config ./config.yaml
-python3 scripts/sync_bruno.py sync --env ./.env
-
-# Add a single endpoint manually to the collection
-python3 scripts/sync_bruno.py add-endpoint --method POST --path /api/v1/users --name "Create User"
+bruno-sync sync --config ./config.yaml     # Use YAML config
+bruno-sync sync --env ./.env               # Use .env config
+bruno-sync sync --project-root ./src       # Scan a subdirectory
 ```
 
 ---
@@ -63,7 +77,7 @@ Use these documents to understand specific aspects of Bruno files and their inte
 
 When you are acting as an agent working on a project with this skill:
 
-1. **Detect API Modifications**: Whenever you create or modify an API endpoint in the codebase (e.g. adding a new controller, modifying route parameters, changing methods), you **MUST** automatically trigger `sync_bruno.py` or manually update the corresponding `.bru` files.
+1. **Detect API Modifications**: Whenever you create or modify an API endpoint in the codebase (e.g. adding a new controller, modifying route parameters, changing methods), you **MUST** automatically trigger `bruno-sync sync` or manually update the corresponding `.bru` files.
 2. **Find Collection Path**: First look in the project's root `config.yaml` (or `config.yml`), then `.env` for the parameter `BRUNO_COLLECTION_PATH`. If not found, look for `bruno.json` or fallback to a default `./bruno` directory.
 3. **Preserve User Modifications**: Do not overwrite the entire `.bru` file if it already exists! Preserve custom tests, scripting, headers, or query parameters that the developer has added.
 4. **Organize Logically**: Mirror the codebase's folder structure inside the Bruno collection directory (e.g., `users/`, `auth/`, `payments/`) to keep the Bruno sidebar clean and readable.
