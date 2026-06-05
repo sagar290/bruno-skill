@@ -22,23 +22,22 @@ Since Bruno stores all requests as simple text files, any changes or additions m
 
 ## Route Sync Utility
 
-This skill includes a zero-dependency Python package with a CLI:
+This skill includes a zero-dependency, installable Python package with a CLI command:
 
-```bash
-python3 scripts/sync_bruno.py sync              # Scan codebase and sync .bru files
-python3 scripts/sync_bruno.py sync --dry-run    # Preview changes without writing
-python3 scripts/sync_bruno.py sync --prune      # Also remove orphaned .bru files
-python3 scripts/sync_bruno.py sync --dedup      # Remove duplicate .bru files
-python3 scripts/sync_bruno.py prune             # Standalone prune of orphaned files
-python3 scripts/sync_bruno.py add-endpoint --method POST --path /api/v1/users
+```
+bruno-sync sync              # Scan codebase and sync .bru files
+bruno-sync sync --dry-run    # Preview changes without writing
+bruno-sync sync --prune      # Also remove orphaned .bru files
+bruno-sync sync --dedup      # Remove duplicate .bru files
+bruno-sync prune             # Standalone prune of orphaned files
+bruno-sync add-endpoint --method POST --path /api/v1/users
 ```
 
-If installed locally via `pip install -e .`, the `bruno-sync` command is also available:
-
+Alternatively, for submodule/clone installs:
 ```bash
-bruno-sync sync
-bruno-sync sync --dry-run
-bruno-sync sync --prune
+python3 scripts/sync_bruno.py sync
+python3 scripts/sync_bruno.py sync --dry-run --verbose
+python3 scripts/sync_bruno.py prune
 ```
 
 ### Verbosity Control
@@ -51,9 +50,9 @@ bruno-sync sync --prune
 ### Configuration
 
 ```bash
-python3 scripts/sync_bruno.py sync --config ./config.yaml     # Use YAML config
-python3 scripts/sync_bruno.py sync --env ./.env               # Use .env config
-python3 scripts/sync_bruno.py sync --project-root ./src       # Scan a subdirectory
+bruno-sync sync --config ./config.yaml     # Use YAML config
+bruno-sync sync --env ./.env               # Use .env config
+bruno-sync sync --project-root ./src       # Scan a subdirectory
 ```
 
 ---
@@ -78,7 +77,7 @@ Use these documents to understand specific aspects of Bruno files and their inte
 
 When you are acting as an agent working on a project with this skill:
 
-1. **Detect API Modifications**: Whenever you create or modify an API endpoint in the codebase (e.g. adding a new controller, modifying route parameters, changing methods), you **MUST** automatically trigger `python3 scripts/sync_bruno.py sync` or manually update the corresponding `.bru` files.
+1. **Detect API Modifications**: Whenever you create or modify an API endpoint in the codebase (e.g. adding a new controller, modifying route parameters, changing methods), you **MUST** automatically trigger `bruno-sync sync` or manually update the corresponding `.bru` files.
 2. **Find Collection Path**: First look in the project's root `config.yaml` (or `config.yml`), then `.env` for the parameter `BRUNO_COLLECTION_PATH`. If not found, look for `bruno.json` or fallback to a default `./bruno` directory.
 3. **Preserve User Modifications**: Do not overwrite the entire `.bru` file if it already exists! Preserve custom tests, scripting, headers, or query parameters that the developer has added.
 4. **Organize Logically**: Mirror the codebase's folder structure inside the Bruno collection directory (e.g., `users/`, `auth/`, `payments/`) to keep the Bruno sidebar clean and readable.

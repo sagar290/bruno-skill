@@ -2,8 +2,8 @@
 """
 Backward-compatible entry point.
 
-Run directly: python3 scripts/sync_bruno.py sync
-Or install locally (pip install -e .) and use: bruno-sync sync
+Prefer the installed ``bruno-sync`` CLI, but fall back to running
+the package directly when installed from source or as a submodule.
 """
 
 import sys
