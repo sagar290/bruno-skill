@@ -11,16 +11,7 @@ Auto-generate and sync Bruno `.bru` API collection files from your codebase.
 
 ## Installation
 
-**pip install (recommended for standalone use):**
-```bash
-pip install -e .
-# or from a remote repo:
-# pip install git+https://github.com/sagar290/bruno-skill.git
-```
-
-This exposes the `bruno-sync` CLI command globally.
-
-**Git Submodule (for monorepo skill use):**
+**Git Submodule (recommended):**
 ```bash
 git submodule add git@github.com:sagar290/bruno-skill.git skills/bruno
 ```
@@ -33,36 +24,26 @@ rm -rf skills/bruno/.git
 
 ## Usage
 
-### Installed via pip
-
 ```bash
 # Sync all endpoints
-bruno-sync sync
+python3 skills/bruno/scripts/sync_bruno.py sync
 
 # Preview changes without writing
-bruno-sync sync --dry-run
+python3 skills/bruno/scripts/sync_bruno.py sync --dry-run
 
 # Verbose / quiet output
-bruno-sync -v sync
-bruno-sync -q sync
+python3 skills/bruno/scripts/sync_bruno.py -v sync
+python3 skills/bruno/scripts/sync_bruno.py -q sync
 
 # Prune orphaned .bru files
-bruno-sync prune
+python3 skills/bruno/scripts/sync_bruno.py prune
 
 # Add a single endpoint
-bruno-sync add-endpoint --method POST --path /api/v1/users --name "Create User"
+python3 skills/bruno/scripts/sync_bruno.py add-endpoint --method POST --path /api/v1/users
 
 # Specify config
-bruno-sync sync --config ./config.yaml
-bruno-sync sync --env ./.env
-```
-
-### Using the script directly (submodule / clone)
-
-```bash
-python3 skills/bruno/scripts/sync_bruno.py sync
-python3 skills/bruno/scripts/sync_bruno.py sync --dry-run --verbose
-python3 skills/bruno/scripts/sync_bruno.py prune
+python3 skills/bruno/scripts/sync_bruno.py sync --config ./config.yaml
+python3 skills/bruno/scripts/sync_bruno.py sync --env ./.env
 ```
 
 ## Configuration
@@ -86,11 +67,11 @@ BRUNO_COLLECTION_NAME=My Project API
 **Cursor / Cline** — add to `.cursorrules` or `.clinerules`:
 ```
 When you create, delete, or modify an API endpoint, run:
-bruno-sync sync
+python3 skills/bruno/scripts/sync_bruno.py sync
 ```
 
 **Claude Code** — include in your prompt:
-> Whenever you update routes, run `bruno-sync sync`
+> Whenever you update routes, run `python3 skills/bruno/scripts/sync_bruno.py sync`
 
 **Antigravity SDK:**
 ```python
@@ -126,31 +107,27 @@ config = LocalAgentConfig(skills_paths=["./skills"])
 ## Directory Structure
 
 ```
-bruno_sync/           # Installable Python package
-  __init__.py         # Package metadata
-  cli.py              # CLI entry point (bruno-sync command)
+bruno_sync/           # Python package (importable, testable)
+  __init__.py
+  cli.py              # CLI entry point
   parsers.py          # YAML, dotenv, config loaders
   bru.py              # .bru file parser/writer
   collection.py       # Sync, prune, dedup logic
-  scanner.py          # Directory scanner dispatcher
+  scanner.py           # Directory scanner dispatcher
   log.py              # Styled output with verbosity levels
   scanners/           # Language-specific route scanners
-    go.py             # Gin, Chi, gorilla/mux
-    java.py           # Spring Boot
-    javascript.py     # Express, Fastify, Koa, Next.js
-    python.py         # Flask, FastAPI
-    ruby.py           # Rails
+    go.py, java.py, javascript.py, python.py, ruby.py, php.py
 scripts/
-  sync_bruno.py      # Backward-compatible entry point
+  sync_bruno.py       # CLI entry point (run this directly)
 tests/
-  test_sync_bruno.py # 67 unit & integration tests
-references/          # Bruno syntax, VS Code integration guides
-examples/            # Config templates and sample routes
+  test_sync_bruno.py  # 77 unit & integration tests
+references/           # Bruno syntax, VS Code integration guides
+examples/             # Config templates and sample routes
 ```
 
 ## Features
 
-- **Multi-framework scanning** — Gin, Chi, gorilla/mux, Express, Fastify, Koa, Next.js, Flask, FastAPI, Spring Boot, Rails
+- **Multi-framework scanning** — Gin, Chi, gorilla/mux, Express, Fastify, Koa, Next.js, Flask, FastAPI, Spring Boot, Rails, Laravel
 - **Path variables** — auto-detects `/users/:id` and `/users/{id}` patterns
 - **Logical folders** — routes grouped by path depth (e.g. `api/v1/users-get.bru`)
 - **Merge-safe** — preserves your custom headers, tests, and scripts on re-sync
