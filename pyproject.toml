@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bruno-sync"
+version = "1.0.0"
+description = "Zero-dependency CLI to sync API endpoints from codebases into Bruno collections"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+keywords = ["bruno", "api", "sync", "collection", "testing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Web Services",
+]
+
+[project.scripts]
+bruno-sync = "bruno_sync.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[tool.setuptools.packages.find]
+include = ["bruno_sync*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
