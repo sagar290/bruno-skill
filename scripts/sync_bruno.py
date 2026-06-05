@@ -166,7 +166,167 @@ def load_config(root_dir=None):
     print_info(f"No custom configuration found. Using defaults (Path: {config['collection_path']})")
     return config
 
+def resolve_collection_dir(project_root, collection_path):
+    """Resolve collection path supporting ~, absolute, and project-relative paths."""
+    expanded = os.path.expanduser(collection_path)
+    if os.path.isabs(expanded):
+        return os.path.abspath(expanded)
+    return os.path.abspath(os.path.join(project_root, expanded))
+
+# --- Collection index (scan existing .bru files first) ---
+
+AUTO_SYNC_FOLDER = '_sync'
+COLLECTION_SKIP_DIRS = {'.git', 'node_modules', 'environments'}
+HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD']
+
+def join_url_paths(*parts):
+    segments = []
+    for part in parts:
+        if not part:
+            continue
+        segments.extend([p for p in part.strip('/').split('/') if p])
+    return '/' + '/'.join(segments) if segments else '/'
+
+def normalize_path(path):
+    path = path.split('?')[0].strip()
+    if not path.startswith('/'):
+        path = '/' + path
+    return re.sub(r'/+', '/', path).rstrip('/') or '/'
+
+def extract_path_from_url(url):
+    """Extract the URL path from a Bruno request URL (strips vars and host)."""
+    path = re.sub(r'\{\{[^}]+\}\}', '', url).strip()
+    if '://' in path:
+        path = path.split('://', 1)[1]
+        path = '/' + path.split('/', 1)[1] if '/' in path else '/'
+    return normalize_path(path)
+
+def extract_endpoint_from_bru(content):
+    """Return (method, path) for an HTTP .bru file, or None."""
+    blocks = parse_bru_blocks(content)
+    meta = blocks.get('meta', '')
+    meta_compact = re.sub(r'\s+', '', meta.lower())
+    if 'type:http' not in meta_compact:
+        return None
+
+    for method in [m.lower() for m in HTTP_METHODS]:
+        if method not in blocks:
+            continue
+        match = re.search(r'url:\s*(.+)', blocks[method])
+        if match:
+            return method.upper(), extract_path_from_url(match.group(1).strip())
+    return None
+
+def request_file_priority(filepath, collection_dir):
+    """Prefer manually organized folders over auto-synced or root-level files."""
+    rel = os.path.relpath(filepath, collection_dir).replace('\\', '/')
+    score = rel.count('/')
+
+    if rel.startswith(f'{AUTO_SYNC_FOLDER}/'):
+        score -= 200
+    elif '/' not in rel:
+        score -= 100
+
+    return score
+
+def scan_collection(collection_dir):
+    """
+    Scan an existing Bruno collection and index requests by method + path.
+    Returns (exact_index, all_entries) where all_entries supports suffix matching.
+    """
+    exact_index = {}
+    exact_priority = {}
+    all_entries = []
+
+    if not os.path.isdir(collection_dir):
+        return exact_index, all_entries
+
+    for root, dirs, files in os.walk(collection_dir):
+        dirs[:] = [d for d in dirs if d not in COLLECTION_SKIP_DIRS]
+        for filename in files:
+            if not filename.endswith('.bru') or filename == 'folder.bru':
+                continue
+
+            filepath = os.path.join(root, filename)
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    endpoint = extract_endpoint_from_bru(f.read())
+                if not endpoint:
+                    continue
+
+                method, path = endpoint
+                key = (method, path)
+                priority = request_file_priority(filepath, collection_dir)
+                if key not in exact_index or priority > exact_priority[key]:
+                    exact_index[key] = filepath
+                    exact_priority[key] = priority
+                all_entries.append((method, path, filepath, priority))
+            except Exception as e:
+                print_warning(f"Could not index {filepath}: {e}")
+
+    return exact_index, all_entries
+
+def find_matching_file(method, path, exact_index, all_entries):
+    """Find an existing .bru file for a route without reorganizing the collection."""
+    norm = normalize_path(path)
+    key = (method, norm)
+    if key in exact_index:
+        return exact_index[key]
+
+    candidates = []
+    for entry_method, entry_path, filepath, priority in all_entries:
+        if entry_method != method:
+            continue
+        if entry_path == norm or entry_path.endswith(norm) or norm.endswith(entry_path):
+            candidates.append((priority, len(entry_path), filepath))
+
+    if not candidates:
+        return None
+    return max(candidates, key=lambda item: (item[0], item[1]))[2]
+
 # --- Codebase Route Scanner ---
+
+def scan_go_file_for_routes(filepath):
+    """Resolve Gin group prefixes so routes include full paths (e.g. /api/v1/auth/login)."""
+    routes = []
+    prefix_map = {}
+
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            lines = f.readlines()
+    except Exception as e:
+        print_warning(f"Could not scan Go file {filepath}: {e}")
+        return routes
+
+    group_pattern = re.compile(r'(\w+)\s*:=\s*(\w+)\.Group\(\s*["\']([^"\']+)["\']')
+    route_pattern = re.compile(
+        r'(\w+)\.(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)\(\s*["\']([^"\']+)["\']'
+    )
+    direct_route_pattern = re.compile(
+        r'(router|engine|r)\.(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)\(\s*["\']([^"\']+)["\']'
+    )
+
+    for line in lines:
+        group_match = group_pattern.search(line)
+        if group_match:
+            var_name, parent_var, prefix = group_match.groups()
+            parent_prefix = prefix_map.get(parent_var, '')
+            prefix_map[var_name] = join_url_paths(parent_prefix, prefix)
+            continue
+
+        route_match = route_pattern.search(line)
+        if route_match:
+            var_name, method, path = route_match.groups()
+            full_path = join_url_paths(prefix_map.get(var_name, ''), path)
+            routes.append({'method': method.upper(), 'path': full_path, 'source': filepath})
+            continue
+
+        direct_match = direct_route_pattern.search(line)
+        if direct_match:
+            _, method, path = direct_match.groups()
+            routes.append({'method': method.upper(), 'path': normalize_path(path), 'source': filepath})
+
+    return routes
 
 def scan_file_for_routes(filepath):
     """
@@ -177,22 +337,15 @@ def scan_file_for_routes(filepath):
     _, ext = os.path.splitext(filepath)
     if ext not in ['.go', '.js', '.ts', '.py', '.rb', '.php', '.java']:
         return routes
+
+    if ext == '.go':
+        return scan_go_file_for_routes(filepath)
         
     try:
         with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
             content = f.read()
-            
-        # 1. Match Go Gin / Chi / Fiber patterns: e.g. r.GET("/api/v1/users", handler)
-        # Regex: \.(GET|POST|PUT|DELETE|PATCH|PATCH|OPTIONS|HEAD|Get|Post|Put|Delete|Patch|Options|Head)\(\s*["']([^"']+)["']
-        go_pattern = r'\.(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD|Get|Post|Put|Delete|Patch|Options|Head)\(\s*["\']([^"\']+)["\']'
-        for match in re.finditer(go_pattern, content):
-            method = match.group(1).upper()
-            path = match.group(2)
-            # Filter standard Go router functions that are not actual HTTP methods
-            if method in ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD']:
-                routes.append({'method': method, 'path': path, 'source': filepath})
                 
-        # 2. Match standard Go http.HandleFunc / http.Handle: http.HandleFunc("/path", handler)
+        # 1. Match standard Go http.HandleFunc / http.Handle: http.HandleFunc("/path", handler)
         go_std_pattern = r'http\.HandleFunc\(\s*["\']([^"\']+)["\']'
         for match in re.finditer(go_std_pattern, content):
             routes.append({'method': 'GET', 'path': match.group(1), 'source': filepath})
@@ -351,61 +504,68 @@ def get_folder_and_filename(path_str, method):
     filename = f"{base_name}-{method.lower()}.bru"
     return folder, filename
 
-def sync_endpoint_to_bru(collection_dir, method, path, base_url, seq=1):
+def sync_endpoint_to_bru(collection_dir, method, path, base_url, seq=1, existing_filepath=None):
     """
-    Creates or updates a .bru file, carefully merging and preserving
-    headers, query parameters, auth, assertions, and custom tests.
+    Creates or updates a .bru file. When existing_filepath is set, only merges
+    missing path params and preserves names, URLs, headers, body, and tests.
+    New endpoints are added under _sync/ so manual folders stay untouched.
     """
     method = method.upper()
-    subfolder, filename = get_folder_and_filename(path, method)
-    target_dir = os.path.join(collection_dir, subfolder)
-    
-    os.makedirs(target_dir, exist_ok=True)
-    filepath = os.path.join(target_dir, filename)
-    
-    # 1. Define base meta block
-    clean_name = f"{method} {path}"
-    meta_block = f"  name: {clean_name}\n  type: http\n  seq: {seq}"
-    
-    # 2. Define URL parameters and path block
-    url = f"{base_url}{path}"
-    method_block = f"  url: {url}\n  body: none\n  auth: none"
-    
-    blocks = {}
-    
-    # 3. Read existing file if it exists to preserve developer edits
-    if os.path.exists(filepath):
+    path_params = re.findall(r'[:{]([a-zA-Z0-9_]+)}?', path)
+
+    if existing_filepath:
+        filepath = existing_filepath
+        rel = os.path.relpath(filepath, collection_dir)
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 blocks = parse_bru_blocks(f.read())
-            print_info(f"Updating existing endpoint file: {os.path.join(subfolder, filename)}")
         except Exception as e:
-            print_warning(f"Error reading existing .bru file {filepath}, will recreate: {e}")
-            
-    # 4. Update core routing properties while preserving custom configurations
-    blocks['meta'] = meta_block
-    
-    # Remove any old method blocks if HTTP method changed
-    supported_methods = ['get', 'post', 'put', 'delete', 'patch', 'options', 'head']
-    for m in supported_methods:
-        if m in blocks and m != method.lower():
-            del blocks[m]
-            
-    # Set the current method block
-    blocks[method.lower()] = method_block
-    
-    # Ensure path parameters are generated in the file if present in route (e.g. :id)
-    path_params = re.findall(r'[:{]([a-zA-Z0-9_]+)}?', path)
-    if path_params and 'params:path' not in blocks:
-        param_lines = []
-        for param in path_params:
-            param_lines.append(f"  {param}: ")
-        blocks['params:path'] = '\n'.join(param_lines)
+            print_warning(f"Could not read existing file {rel}: {e}")
+            return 'error'
 
-    # 5. Write blocks back to file
-    content = serialize_bru_blocks(blocks)
+        changed = False
+        if path_params and 'params:path' not in blocks:
+            blocks['params:path'] = '\n'.join(f"  {param}: " for param in path_params)
+            changed = True
+
+        if changed:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(serialize_bru_blocks(blocks))
+            print_info(f"Updated existing request (preserved layout): {rel}")
+            return 'updated'
+
+        print_info(f"Preserved existing request (no changes): {rel}")
+        return 'preserved'
+
+    subfolder, filename = get_folder_and_filename(path, method)
+    target_dir = os.path.join(collection_dir, AUTO_SYNC_FOLDER, subfolder)
+    os.makedirs(target_dir, exist_ok=True)
+    filepath = os.path.join(target_dir, filename)
+
+    if os.path.exists(filepath):
+        return sync_endpoint_to_bru(
+            collection_dir, method, path, base_url, seq=seq, existing_filepath=filepath
+        )
+
+    clean_name = f"{method} {path}"
+    meta_block = f"  name: {clean_name}\n  type: http\n  seq: {seq}"
+    url = f"{base_url}{path}"
+    method_block = f"  url: {url}\n  body: none\n  auth: none"
+
+    blocks = {
+        'meta': meta_block,
+        method.lower(): method_block,
+    }
+
+    if path_params:
+        blocks['params:path'] = '\n'.join(f"  {param}: " for param in path_params)
+
     with open(filepath, 'w', encoding='utf-8') as f:
-        f.write(content)
+        f.write(serialize_bru_blocks(blocks))
+
+    rel = os.path.relpath(filepath, collection_dir)
+    print_info(f"Added new request: {rel}")
+    return 'added'
 
 # --- Collection Management ---
 
@@ -487,43 +647,62 @@ def main():
             print_error(f"Env file not found: {args.env}")
             sys.exit(1)
             
-    # Absolute path to collection
-    collection_dir = os.path.abspath(os.path.join(project_root, cfg['collection_path']))
+    collection_dir = resolve_collection_dir(project_root, cfg['collection_path'])
     
     if args.command == "sync":
+        initialize_collection(collection_dir, cfg['collection_name'])
+
+        print_info(f"Scanning existing Bruno collection at {collection_dir}...")
+        exact_index, all_entries = scan_collection(collection_dir)
+        print_info(f"Indexed {len(all_entries)} existing HTTP requests in collection.")
+
         print_info(f"Scanning project files under {project_root}...")
         routes = scan_directory(project_root)
-        print_info(f"Found {len(routes)} unique API endpoints.")
-        
+        print_info(f"Found {len(routes)} unique API endpoints in codebase.")
+
         if not routes:
-            print_warning("No API endpoints were automatically detected. Make sure to define controllers/routes in your code.")
-            # Initialize collection anyway to create the foundation
-            initialize_collection(collection_dir, cfg['collection_name'])
+            print_warning("No API endpoints were automatically detected. Existing collection was left unchanged.")
             return
-            
-        initialize_collection(collection_dir, cfg['collection_name'])
-        
-        # Sync each endpoint to collection
+
+        stats = {'preserved': 0, 'updated': 0, 'added': 0, 'error': 0}
+
         for idx, route in enumerate(routes, start=1):
-            sync_endpoint_to_bru(
+            existing_filepath = find_matching_file(
+                route['method'], route['path'], exact_index, all_entries
+            )
+            result = sync_endpoint_to_bru(
                 collection_dir=collection_dir,
                 method=route['method'],
                 path=route['path'],
                 base_url=cfg['base_url'],
-                seq=idx
+                seq=idx,
+                existing_filepath=existing_filepath,
             )
-            
-        print_success(f"Synced {len(routes)} endpoints to Bruno collection at: {collection_dir}")
+            stats[result] = stats.get(result, 0) + 1
+
+        print_success(
+            f"Sync complete at {collection_dir}: "
+            f"{stats.get('preserved', 0)} preserved, "
+            f"{stats.get('updated', 0)} updated, "
+            f"{stats.get('added', 0)} added to {AUTO_SYNC_FOLDER}/, "
+            f"{stats.get('error', 0)} errors"
+        )
+        print_info("Manual folders and requests were not removed or reorganized.")
         
     elif args.command == "add-endpoint":
         initialize_collection(collection_dir, cfg['collection_name'])
-        sync_endpoint_to_bru(
+        exact_index, all_entries = scan_collection(collection_dir)
+        existing_filepath = find_matching_file(
+            args.method.upper(), args.path, exact_index, all_entries
+        )
+        result = sync_endpoint_to_bru(
             collection_dir=collection_dir,
             method=args.method,
             path=args.path,
-            base_url=cfg['base_url']
+            base_url=cfg['base_url'],
+            existing_filepath=existing_filepath,
         )
-        print_success(f"Successfully added manual endpoint: {args.method} {args.path}")
+        print_success(f"Endpoint {args.method} {args.path} — {result}")
 
 if __name__ == "__main__":
     main()
