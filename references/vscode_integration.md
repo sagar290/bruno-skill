@@ -46,7 +46,7 @@ Now, the entire API structure is visualized beautifully as a tree in your editor
 Because the state is purely file-based, here is how you and the AI coding agent work together:
 
 ### Agent-to-Developer Sync
-*   When the agent develops a new API route in the backend code, it runs `python3 scripts/sync_bruno.py sync`.
+*   When the agent develops a new API route in the backend code, it runs `bruno-sync sync`.
 *   The script adds a new `.bru` file to the collection.
 *   Your VS Code Bruno sidebar will **instantly render the new request** without reloading.
 *   You can click on the request, click "Send", and test the endpoint immediately.
@@ -54,7 +54,7 @@ Because the state is purely file-based, here is how you and the AI coding agent 
 ### Developer-to-Agent Sync
 *   If you manually edit a request (e.g. adding authentication details, request body parameters, headers, or javascript tests), the extension writes these changes directly into the `.bru` file.
 *   When the agent reads the `.bru` file later, it will **detect all your custom updates**.
-*   The sync tool has a smart merging algorithm that parses and preserves your custom edits (headers, body parameters, tests) and only updates the base routing URL/method when code changes.
+*   The `bruno-sync` tool has a smart merging algorithm that parses and preserves your custom edits (headers, body parameters, tests) and only updates the base routing URL/method when code changes.
 
 ---
 

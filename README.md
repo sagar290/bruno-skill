@@ -22,6 +22,12 @@ git clone git@github.com:sagar290/bruno-skill.git skills/bruno
 rm -rf skills/bruno/.git
 ```
 
+**Local development install (optional, for the CLI command):**
+```bash
+cd skills/bruno
+pip install -e .
+```
+
 ## Usage
 
 ```bash
@@ -39,11 +45,18 @@ python3 skills/bruno/scripts/sync_bruno.py -q sync
 python3 skills/bruno/scripts/sync_bruno.py prune
 
 # Add a single endpoint
-python3 skills/bruno/scripts/sync_bruno.py add-endpoint --method POST --path /api/v1/users
+python3 skills/bruno/scripts/sync_bruno.py add-endpoint --method POST --path /api/v1/users --name "Create User"
 
 # Specify config
 python3 skills/bruno/scripts/sync_bruno.py sync --config ./config.yaml
 python3 skills/bruno/scripts/sync_bruno.py sync --env ./.env
+```
+
+If installed via `pip install -e .`, the `sync_bruno.py` script also exposes a `bruno-sync` CLI command:
+```bash
+bruno-sync sync
+bruno-sync sync --dry-run --verbose
+bruno-sync prune
 ```
 
 ## Configuration
@@ -107,22 +120,27 @@ config = LocalAgentConfig(skills_paths=["./skills"])
 ## Directory Structure
 
 ```
-bruno_sync/           # Python package (importable, testable)
-  __init__.py
+bruno_sync/           # Python package source
+  __init__.py         # Package metadata
   cli.py              # CLI entry point
   parsers.py          # YAML, dotenv, config loaders
   bru.py              # .bru file parser/writer
   collection.py       # Sync, prune, dedup logic
-  scanner.py           # Directory scanner dispatcher
+  scanner.py          # Directory scanner dispatcher
   log.py              # Styled output with verbosity levels
   scanners/           # Language-specific route scanners
-    go.py, java.py, javascript.py, python.py, ruby.py, php.py
+    go.py             # Gin, Chi, gorilla/mux
+    java.py           # Spring Boot
+    javascript.py     # Express, Fastify, Koa, Next.js
+    php.py            # Laravel
+    python.py         # Flask, FastAPI
+    ruby.py           # Rails
 scripts/
-  sync_bruno.py       # CLI entry point (run this directly)
+  sync_bruno.py      # Entry point (python3 scripts/sync_bruno.py ...)
 tests/
-  test_sync_bruno.py  # 77 unit & integration tests
-references/           # Bruno syntax, VS Code integration guides
-examples/             # Config templates and sample routes
+  test_sync_bruno.py # 77 unit & integration tests
+references/          # Bruno syntax, VS Code integration guides
+examples/            # Config templates and sample routes
 ```
 
 ## Features
