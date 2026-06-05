@@ -1,0 +1,3 @@
+[submodule "bruno-skill"]
+	path = bruno-skill
+	url = git@github.com:sagar290/bruno-skill.git
