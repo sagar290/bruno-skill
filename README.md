@@ -4,7 +4,7 @@ Auto-generate and sync Bruno `.bru` API collection files from your codebase.
 
 ## How It Works
 
-1. Scan your codebase for route definitions (Go/Gin/Chi/mux, Express/Fastify/Koa, Next.js, Flask/FastAPI, Spring Boot, Rails, etc.)
+1. Scan your codebase for route definitions (Go/Gin/Chi/mux, Express/Fastify/Koa, Next.js, Flask/FastAPI, Spring Boot, Rails, Laravel, etc.)
 2. Generate/update `.bru` files in your Bruno collection
 3. Existing custom headers, tests, and scripts are preserved on sync
 4. VS Code Bruno extension picks up changes instantly
@@ -108,6 +108,7 @@ config = LocalAgentConfig(skills_paths=["./skills"])
 | Python | Flask, FastAPI |
 | Java | Spring Boot (@RequestMapping, @GetMapping, etc.) |
 | Ruby | Rails (resources, verb routes) |
+| PHP | Laravel (Route::get, apiResource, prefix groups, match/any) |
 
 ## CLI Reference
 

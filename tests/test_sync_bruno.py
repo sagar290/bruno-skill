@@ -31,6 +31,7 @@ from bruno_sync.scanners.go import scan_go_file_for_routes, scan_chi_file_for_ro
 from bruno_sync.scanners.java import scan_java_spring_file_for_routes
 from bruno_sync.scanners.javascript import scan_nextjs_file_for_routes, scan_fastify_file_for_routes, scan_koa_file_for_routes
 from bruno_sync.scanners.ruby import scan_ruby_file_for_routes
+from bruno_sync.scanners.php import scan_laravel_file_for_routes
 from bruno_sync.scanner import scan_file_for_routes
 from bruno_sync.collection import (
     sync_endpoint_to_bru,
@@ -586,6 +587,80 @@ def health():
         methods = {r['method'] for r in routes}
         self.assertIn('GET', methods)
         self.assertIn('POST', methods)
+
+
+class TestLaravelScanner(unittest.TestCase):
+    def test_laravel_basic_routes(self):
+        content = """<?php
+use Illuminate\\Support\\Facades\\Route;
+
+Route::get('/api/v1/health', [HealthController::class, 'index']);
+Route::post('/api/v1/users', [UserController::class, 'store']);
+Route::delete('/api/v1/users/{id}', [UserController::class, 'destroy']);
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.php', delete=False) as f:
+            f.write(content)
+            f.flush()
+            routes = scan_laravel_file_for_routes(f.name)
+        os.unlink(f.name)
+        self.assertGreaterEqual(len(routes), 3)
+        paths = {r['path'] for r in routes}
+        self.assertIn('/api/v1/health', paths)
+        self.assertIn('/api/v1/users', paths)
+        methods = {r['method'] for r in routes}
+        self.assertIn('GET', methods)
+        self.assertIn('POST', methods)
+        self.assertIn('DELETE', methods)
+
+    def test_laravel_api_resource(self):
+        content = """<?php
+Route::apiResource('posts', PostController::class);
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.php', delete=False) as f:
+            f.write(content)
+            f.flush()
+            routes = scan_laravel_file_for_routes(f.name)
+        os.unlink(f.name)
+        methods = {r['method'] for r in routes}
+        paths = {r['path'] for r in routes}
+        self.assertIn('GET', methods)
+        self.assertIn('POST', methods)
+        self.assertIn('PUT', methods)
+        self.assertIn('DELETE', methods)
+        self.assertIn('/posts', paths)
+
+    def test_laravel_prefix_group(self):
+        content = """<?php
+Route::prefix('api/v1')->group(function () {
+    Route::get('/health', [HealthController::class, 'index']);
+    Route::post('/users', [UserController::class, 'store']);
+});
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.php', delete=False) as f:
+            f.write(content)
+            f.flush()
+            routes = scan_laravel_file_for_routes(f.name)
+        os.unlink(f.name)
+        paths = {r['path'] for r in routes}
+        self.assertIn('/api/v1/health', paths)
+        self.assertIn('/api/v1/users', paths)
+
+    def test_laravel_match_and_any(self):
+        content = """<?php
+Route::match(['get', 'post'], '/api/v1/mixed', [Controller::class, 'mixed']);
+Route::any('/api/v1/wildcard', [Controller::class, 'any']);
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.php', delete=False) as f:
+            f.write(content)
+            f.flush()
+            routes = scan_laravel_file_for_routes(f.name)
+        os.unlink(f.name)
+        methods = {r['method'] for r in routes}
+        self.assertIn('GET', methods)
+        self.assertIn('POST', methods)
+        paths = {r['path'] for r in routes}
+        self.assertIn('/api/v1/mixed', paths)
+        self.assertIn('/api/v1/wildcard', paths)
 
 
 class TestExpressScanner(unittest.TestCase):

@@ -7,6 +7,7 @@ from bruno_sync.scanners.javascript import (
     scan_koa_file_for_routes,
     scan_nextjs_file_for_routes,
 )
+from bruno_sync.scanners.php import scan_laravel_file_for_routes
 from bruno_sync.scanners.python import scan_python_file_for_routes
 from bruno_sync.scanners.ruby import scan_ruby_file_for_routes
 
@@ -18,6 +19,7 @@ __all__ = [
     "scan_nextjs_file_for_routes",
     "scan_fastify_file_for_routes",
     "scan_koa_file_for_routes",
+    "scan_laravel_file_for_routes",
     "scan_python_file_for_routes",
     "scan_ruby_file_for_routes",
 ]
