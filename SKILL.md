@@ -13,7 +13,7 @@ Since Bruno stores all requests as simple text files, any changes or additions m
 
 ## Capabilities & Workflows
 
-1. **Auto-Discovery of API Routes**: Automatically analyze codebases (Go/Gin/Chi/mux, Express/Fastify/Koa, Next.js, Flask/FastAPI, Spring Boot, Rails, and more) to discover endpoints.
+1. **Auto-Discovery of API Routes**: Automatically analyze codebases (Go/Gin/Chi/mux, Express/Fastify/Koa, Next.js, Flask/FastAPI, Spring Boot, Rails, Laravel, and more) to discover endpoints.
 2. **Synchronized State**: Read project configurations (`.env`, `config.yaml`, `config.yml`, or `bruno.json`) to find the Bruno collection folder and automatically generate or update `.bru` request files.
 3. **Harmonious Merging**: Ensure that when endpoints are updated, manually created headers, parameters, and Javascript assertions/tests in the `.bru` files are carefully merged and preserved.
 4. **Git-Friendly API Management**: Store and commit API collections in version control alongside the source code.

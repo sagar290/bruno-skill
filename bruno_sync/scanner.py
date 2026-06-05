@@ -13,6 +13,7 @@ from .scanners.javascript import (
     scan_koa_file_for_routes,
     scan_nextjs_file_for_routes,
 )
+from .scanners.php import scan_laravel_file_for_routes
 from .scanners.python import scan_python_file_for_routes
 from .scanners.ruby import scan_ruby_file_for_routes
 
@@ -40,6 +41,9 @@ def scan_file_for_routes(filepath: str) -> list[RouteInfo]:
 
     if ext in (".rb",):
         return scan_ruby_file_for_routes(filepath)
+
+    if ext in (".php",):
+        return scan_laravel_file_for_routes(filepath)
 
     try:
         with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
