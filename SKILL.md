@@ -81,3 +81,7 @@ When you are acting as an agent working on a project with this skill:
 2. **Find Collection Path**: First look in the project's root `config.yaml` (or `config.yml`), then `.env` for the parameter `BRUNO_COLLECTION_PATH`. If not found, look for `bruno.json` or fallback to a default `./bruno` directory.
 3. **Preserve User Modifications**: Do not overwrite the entire `.bru` file if it already exists! Preserve custom tests, scripting, headers, or query parameters that the developer has added.
 4. **Organize Logically**: Mirror the codebase's folder structure inside the Bruno collection directory (e.g., `users/`, `auth/`, `payments/`) to keep the Bruno sidebar clean and readable.
+5. **Ignore `_sync/` in Git**: Auto-generated `.bru` files are written to a `_sync/` folder inside the collection to keep them separate from hand-written files. **Always** add `_sync/` to your project's `.gitignore` to avoid committing auto-generated files. Example:
+   ```bash
+   echo "_sync/" >> .gitignore
+   ```
