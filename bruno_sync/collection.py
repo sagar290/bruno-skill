@@ -156,6 +156,34 @@ def prune_orphaned_files(collection_dir: str, active_routes: list[dict[str, str]
     return pruned
 
 
+def ensure_gitignore(project_root: str) -> None:
+    """Ensure _sync/ is listed in the project's .gitignore.
+
+    If a .gitignore exists and does not yet contain ``_sync``, append it.
+    If .gitignore does not exist, create one with ``_sync/``.
+    """
+    gitignore_path = os.path.join(project_root, ".gitignore")
+
+    if os.path.isfile(gitignore_path):
+        with open(gitignore_path, "r", encoding="utf-8") as f:
+            lines = f.read().splitlines()
+        if any(line.strip().rstrip("/") == "_sync" for line in lines):
+            return
+        needs_newline = lines and lines[-1] != ""
+        with open(gitignore_path, "a", encoding="utf-8") as f:
+            if needs_newline:
+                f.write("\n")
+            f.write("_sync/\n")
+        print_info(f"Added '_sync/' to {gitignore_path}")
+    else:
+        if DRY_RUN:
+            print_info(f"[DRY-RUN] Would create {gitignore_path} with '_sync/' entry")
+            return
+        with open(gitignore_path, "w", encoding="utf-8") as f:
+            f.write("_sync/\n")
+        print_info(f"Created {gitignore_path} with '_sync/' entry")
+
+
 def initialize_collection(collection_dir: str, collection_name: str) -> None:
     """Create a bruno.json file at the collection root if not present."""
     bruno_json_path = os.path.join(collection_dir, "bruno.json")

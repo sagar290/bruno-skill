@@ -38,6 +38,7 @@ from bruno_sync.collection import (
     prune_orphaned_files,
     dedup_collection,
     initialize_collection,
+    ensure_gitignore,
     set_dry_run,
 )
 
@@ -1104,6 +1105,60 @@ class TestInputValidation(unittest.TestCase):
         path_without_slash = 'api/v1/users'
         normalized = '/' + path_without_slash if not path_without_slash.startswith('/') else path_without_slash
         self.assertEqual(normalized, '/api/v1/users')
+
+
+class TestEnsureGitignore(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_creates_gitignore_if_missing(self):
+        ensure_gitignore(self.tmpdir)
+        gitignore_path = os.path.join(self.tmpdir, ".gitignore")
+        self.assertTrue(os.path.exists(gitignore_path))
+        with open(gitignore_path) as f:
+            self.assertIn("_sync/", f.read())
+
+    def test_appends_to_existing_gitignore(self):
+        gitignore_path = os.path.join(self.tmpdir, ".gitignore")
+        with open(gitignore_path, "w") as f:
+            f.write("node_modules/\n")
+        ensure_gitignore(self.tmpdir)
+        with open(gitignore_path) as f:
+            content = f.read()
+        self.assertIn("node_modules/", content)
+        self.assertIn("_sync/", content)
+
+    def test_does_not_duplicate_entry(self):
+        gitignore_path = os.path.join(self.tmpdir, ".gitignore")
+        with open(gitignore_path, "w") as f:
+            f.write("_sync/\n")
+        ensure_gitignore(self.tmpdir)
+        with open(gitignore_path) as f:
+            content = f.read()
+        self.assertEqual(content.count("_sync/"), 1)
+
+    def test_detects_bare_sync_entry(self):
+        gitignore_path = os.path.join(self.tmpdir, ".gitignore")
+        with open(gitignore_path, "w") as f:
+            f.write("_sync\n")
+        ensure_gitignore(self.tmpdir)
+        with open(gitignore_path) as f:
+            content = f.read()
+        lines = [l for l in content.splitlines() if l.strip()]
+        sync_lines = [l for l in lines if "_sync" in l]
+        self.assertEqual(len(sync_lines), 1)
+
+    def test_dry_run_does_not_create_gitignore(self):
+        set_dry_run(True)
+        try:
+            ensure_gitignore(self.tmpdir)
+            gitignore_path = os.path.join(self.tmpdir, ".gitignore")
+            self.assertFalse(os.path.exists(gitignore_path))
+        finally:
+            set_dry_run(False)
 
 
 if __name__ == '__main__':

@@ -11,6 +11,7 @@ import sys
 from .bru import find_matching_file, scan_collection
 from .collection import (
     dedup_collection,
+    ensure_gitignore,
     initialize_collection,
     prune_orphaned_files,
     set_dry_run,
@@ -54,6 +55,7 @@ def main() -> None:
     add_parser.add_argument("--name", help="Optional name for the request")
     add_parser.add_argument("--config", help="Path to config.yaml configuration file")
     add_parser.add_argument("--dry-run", action="store_true", help="Preview changes without writing files")
+    add_parser.add_argument("--project-root", default=".", help="Root directory of the project")
 
     # prune
     prune_parser = subparsers.add_parser("prune", help="Remove orphaned .bru files for routes no longer in codebase")
@@ -119,7 +121,8 @@ def main() -> None:
 
     # ---- add-endpoint ----
     elif args.command == "add-endpoint":
-        _cmd_add_endpoint(args, cfg, collection_dir)
+        project_root_add = os.path.abspath(getattr(args, "project_root", "."))
+        _cmd_add_endpoint(args, cfg, collection_dir, project_root_add)
 
     # ---- prune ----
     elif args.command == "prune":
@@ -128,6 +131,7 @@ def main() -> None:
 
 def _cmd_sync(args, cfg: dict, collection_dir: str, project_root: str) -> None:
     initialize_collection(collection_dir, cfg["collection_name"])
+    ensure_gitignore(project_root)
 
     print_info(f"Scanning existing Bruno collection at {collection_dir}...")
     exact_index, all_entries = scan_collection(collection_dir)
@@ -174,7 +178,7 @@ def _cmd_sync(args, cfg: dict, collection_dir: str, project_root: str) -> None:
     print_info("Manual folders and requests were not removed or reorganized.")
 
 
-def _cmd_add_endpoint(args, cfg: dict, collection_dir: str) -> None:
+def _cmd_add_endpoint(args, cfg: dict, collection_dir: str, project_root: str) -> None:
     method = args.method.upper()
     if method not in VALID_METHODS:
         print_error(f"Invalid HTTP method: {args.method}. Must be one of: {', '.join(sorted(VALID_METHODS))}")
@@ -185,6 +189,7 @@ def _cmd_add_endpoint(args, cfg: dict, collection_dir: str) -> None:
         path = f"/{path}"
 
     initialize_collection(collection_dir, cfg["collection_name"])
+    ensure_gitignore(project_root)
     exact_index, all_entries = scan_collection(collection_dir)
     existing_filepath = find_matching_file(method, path, exact_index, all_entries)
     result = sync_endpoint_to_bru(
@@ -199,6 +204,7 @@ def _cmd_add_endpoint(args, cfg: dict, collection_dir: str) -> None:
 
 def _cmd_prune(args, collection_dir: str, project_root: str) -> None:
     initialize_collection(collection_dir, "Pruned Collection")
+    ensure_gitignore(project_root)
     print_info(f"Scanning project files under {project_root}...")
     routes = scan_directory(project_root)
     print_info(f"Found {len(routes)} active API endpoints in codebase.")
