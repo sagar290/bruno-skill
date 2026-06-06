@@ -4,10 +4,57 @@ Auto-generate and sync Bruno `.bru` API collection files from your codebase.
 
 ## How It Works
 
-1. Scan your codebase for route definitions (Go/Gin/Chi/mux, Express/Fastify/Koa, Next.js, Flask/FastAPI, Spring Boot, Rails, Laravel, etc.)
-2. Generate/update `.bru` files in your Bruno collection
-3. Existing custom headers, tests, and scripts are preserved on sync
-4. VS Code Bruno extension picks up changes instantly
+When you run `bruno-sync sync`, the tool goes through these steps:
+
+### 1. Load Config
+
+Reads configuration from `config.yaml` → `.env` → `bruno.json` → defaults. Gets `collection_path`, `collection_name`, and `base_url`.
+
+### 2. Initialize
+
+- Creates `bruno.json` at the collection root if it doesn't exist
+- Appends `_sync/` to your project's `.gitignore` if missing (so auto-generated files aren't committed)
+- Scans all existing `.bru` files in the collection and builds an index of `(method, path) → filepath`
+
+### 3. Scan Codebase
+
+Walks your project directory (skipping `.git`, `node_modules`, `vendor`, `_sync`, etc.) and dispatches each source file to a language-specific scanner:
+
+| Extension | Scanners |
+|---|---|
+| `.go` | Gin, Chi, gorilla/mux |
+| `.js` / `.ts` / `.jsx` / `.tsx` | Express, Fastify, Koa, Next.js App Router |
+| `.py` | Flask, FastAPI |
+| `.java` | Spring Boot (@RequestMapping, @GetMapping, etc.) |
+| `.rb` | Rails (resources, verb routes) |
+| `.php` | Laravel (Route::get, apiResource, prefix groups, match/any) |
+
+Output: a deduplicated list of `{method, path, source}` — e.g. `{method: "GET", path: "/api/v1/users", source: "routes.go:12"}`
+
+### 4. Sync Each Route
+
+For every scanned route, the tool checks if a `.bru` file already exists:
+
+- **Already exists** → merge-only: adds missing path params, preserves all your custom headers, tests, auth, and scripts untouched
+- **Doesn't exist** → creates a new file under `collection/_sync/`:
+  ```
+  /api/v1/users/:id GET → collection/_sync/api/v1/users-by-id-get.bru
+  ```
+
+### 5. Optional Cleanup
+
+| Flag | What it does |
+|---|---|
+| `--prune` | Delete `.bru` files in `_sync/` whose routes no longer exist in the codebase |
+| `--dedup` | Delete lower-priority duplicates (manual folders win over `_sync/` over root-level) |
+| `--dry-run` | Preview all changes without writing or deleting anything |
+
+### Key Design Choices
+
+- **`_sync/` isolation** — auto-generated files live in `_sync/`, never overwriting your hand-written `.bru` files. Manual files always win in merge priority.
+- **Merge-safe** — only missing path params are added to existing files. Headers, tests, auth, and scripts are never overwritten.
+- **Auto gitignore** — `_sync/` is appended to `.gitignore` automatically so you don't accidentally commit generated files.
+- **Zero dependencies** — pure Python stdlib, no pip packages required at runtime.
 
 ## Installation
 
