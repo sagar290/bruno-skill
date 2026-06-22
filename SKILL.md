@@ -77,10 +77,14 @@ Use these documents to understand specific aspects of Bruno files and their inte
 
 When you are acting as an agent working on a project with this skill:
 
-1. **Detect API Modifications**: Whenever you create or modify an API endpoint in the codebase (e.g. adding a new controller, modifying route parameters, changing methods), you **MUST** automatically trigger `bruno-sync sync` or manually update the corresponding `.bru` files.
-2. **Find Collection Path**: First look in the project's root `config.yaml` (or `config.yml`), then `.env` for the parameter `BRUNO_COLLECTION_PATH`. If not found, look for `bruno.json` or fallback to a default `./bruno` directory.
+1. **Scan Existing Collection First**: Before making any changes, scan the existing Bruno collection directory for current `.bru` files. Use `bruno-sync sync` only when you need to batch-detect routes from the codebase — do NOT run it blindly, as it may create unnecessary `_sync/` folders. Prefer to update or add individual `.bru` files directly when you know exactly which endpoints changed.
+
+2. **Find Collection Path**: First look in the project's root `config.yaml` (or `config.yml`), then `.env` for the parameter `BRUNO_COLLECTION_PATH`. If not found, look for a `folder.bru` at the project root (the primary Bruno collection marker — its `meta.name` defines the collection name). If still not found, search subdirectories for `folder.bru` or `bruno.json`. Only fallback to a default `./bruno` directory as a last resort.
+
 3. **Preserve User Modifications**: Do not overwrite the entire `.bru` file if it already exists! Preserve custom tests, scripting, headers, or query parameters that the developer has added.
-4. **Organize Logically**: Mirror the codebase's folder structure inside the Bruno collection directory (e.g., `users/`, `auth/`, `payments/`) to keep the Bruno sidebar clean and readable.
+
+4. **Organize Logically**: Mirror the codebase's folder structure inside the Bruno collection directory (e.g., `users/`, `auth/`, `payments/`) to keep the Bruno sidebar clean and readable. Reuse existing folder structures when adding new endpoints — do not create a parallel `_sync/` hierarchy unless the endpoint has no appropriate home.
+
 5. **Ignore `_sync/` in Git**: Auto-generated `.bru` files are written to a `_sync/` folder inside the collection to keep them separate from hand-written files. **Always** add `_sync/` to your project's `.gitignore` to avoid committing auto-generated files. Example:
    ```bash
    echo "_sync/" >> .gitignore
