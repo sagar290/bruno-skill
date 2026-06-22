@@ -260,6 +260,55 @@ def load_config(root_dir: str | None = None) -> ConfigDict:
         except Exception as e:
             print_warning(f"Error parsing .env: {e}")
 
+    def _name_from_folder_bru(folder_bru_path: str) -> str | None:
+        try:
+            from .bru import parse_bru_blocks
+            with open(folder_bru_path, "r", encoding="utf-8") as f:
+                blocks = parse_bru_blocks(f.read())
+            meta = blocks.get("meta", "")
+            for line in meta.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("name:"):
+                    return stripped[5:].strip()
+        except Exception:
+            return None
+        return None
+
+    root_folder_bru = os.path.join(root_dir, "folder.bru")
+    if os.path.exists(root_folder_bru):
+        name = _name_from_folder_bru(root_folder_bru)
+        if name:
+            config["collection_path"] = root_dir
+            config["collection_name"] = name
+            print_info(f"Current directory detected as active Bruno Collection (folder.bru: {name})")
+            return config
+
+    # Search for folder.bru or bruno.json in subdirectories before using defaults
+    try:
+        for entry in os.scandir(root_dir):
+            if not entry.is_dir():
+                continue
+            fb_path = os.path.join(entry.path, "folder.bru")
+            bj_path = os.path.join(entry.path, "bruno.json")
+            if os.path.exists(fb_path):
+                name = _name_from_folder_bru(fb_path) or config["collection_name"]
+                config["collection_path"] = entry.path
+                config["collection_name"] = name
+                print_info(f"Detected existing Bruno Collection at {entry.path} (folder.bru: {name})")
+                return config
+            if os.path.exists(bj_path):
+                try:
+                    with open(bj_path, "r", encoding="utf-8") as f:
+                        bjson = json.load(f)
+                    config["collection_path"] = entry.path
+                    config["collection_name"] = bjson.get("name", config["collection_name"])
+                    print_info(f"Detected existing Bruno Collection at {entry.path} (bruno.json)")
+                    return config
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
     bruno_json_path = os.path.join(root_dir, "bruno.json")
     if os.path.exists(bruno_json_path):
         try:
@@ -267,7 +316,7 @@ def load_config(root_dir: str | None = None) -> ConfigDict:
                 bjson = json.load(f)
                 config["collection_path"] = root_dir
                 config["collection_name"] = bjson.get("name", config["collection_name"])
-            print_info("Current directory detected as active Bruno Collection")
+            print_info("Current directory detected as active Bruno Collection (bruno.json)")
             return config
         except Exception as e:
             print_warning(f"Error reading bruno.json: {e}")
